@@ -10,6 +10,11 @@ import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import de.hacktival.burst.utils.RestClient;
+
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback {
 
     private GoogleMap mMap;
@@ -17,6 +22,23 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // TODO: login in login activity
+        RestClient restClient = new RestClient(Settings.serverUrl + "user/login/");
+        JSONObject requestJson = new JSONObject();
+        restClient.addParam("username", Settings.username);
+        restClient.addParam("password", Settings.password);
+        String resultStr = null; //restClient.executePost();
+        JSONObject resultJson = null;
+        try {
+            resultJson = new JSONObject(resultStr);
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+        if (resultJson != null) {
+
+        }
+
         setContentView(R.layout.activity_maps);
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
