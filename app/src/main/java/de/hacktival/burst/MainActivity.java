@@ -1,54 +1,52 @@
-
 package de.hacktival.burst;
 
 import android.app.PendingIntent;
-import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.location.Address;
-import android.location.Geocoder;
-import android.location.Location;
+import android.graphics.Color;
 import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Build;
+import android.os.Bundle;
+import android.support.annotation.NonNull;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
-import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
-import android.widget.EditText;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import com.android.volley.Request;
 import com.android.volley.Response;
 import com.android.volley.VolleyError;
 import com.android.volley.toolbox.JsonObjectRequest;
 import com.google.android.gms.location.Geofence;
+import com.google.android.gms.location.GeofenceStatusCodes;
 import com.google.android.gms.location.GeofencingClient;
+import com.google.android.gms.location.GeofencingEvent;
 import com.google.android.gms.location.GeofencingRequest;
 import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.tasks.OnFailureListener;
+import com.google.android.gms.tasks.OnSuccessListener;
 
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
 import de.hacktival.burst.utils.Network;
 //import static de.hacktival.burst.Constants;
 
 public class MainActivity extends AppCompatActivity {
 
-    private LocationManager locationMangaer=null;
-    private LocationListener locationListener=null;
+    private static final String TAG = "MainActivity";
+
     private GeofencingClient geofencingClient;
-    private Geofence.Builder zkmFence;
-    private List geofenceList = new ArrayList();
+    private Geofence zkmFence;
+    private PendingIntent geofencePendingIntent;
+    private boolean active = true;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -64,7 +62,7 @@ public class MainActivity extends AppCompatActivity {
             e.printStackTrace();
         }
         JsonObjectRequest jsonObjectRequest = new JsonObjectRequest
-                (Request.Method.POST, Settings.serverUrl+"user/login/", requestParams, new Response.Listener<JSONObject>() {
+                (Request.Method.POST, Settings.serverUrl + "user/login/", requestParams, new Response.Listener<JSONObject>() {
 
                     @Override
                     public void onResponse(JSONObject response) {
@@ -84,51 +82,66 @@ public class MainActivity extends AppCompatActivity {
                         System.out.println("error");
                     }
                 });
-
         Network.getInstance(this).addToRequestQueue(jsonObjectRequest);
-       /* if ( Build.VERSION.SDK_INT >= 23 &&
-                ContextCompat.checkSelfPermission( context, android.Manifest.permission.ACCESS_FINE_LOCATION ) != PackageManager.PERMISSION_GRANTED &&
-                ContextCompat.checkSelfPermission( context, android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            return  ;
-        }
-        locationMangaer = (LocationManager)
-                getSystemService(Context.LOCATION_SERVICE);
-        locationMangaer.requestLocationUpdates(LocationManager
-                .GPS_PROVIDER, 5000, 10,locationListener);
-*/
-        zkmFence.setCircularRegion (49.001620, 8.383602,100.0);
 
-        geofenceList.add(new Geofence.Builder()
-                // Set the request ID of the geofence. This is a string to identify this
-                // geofence.
-                .setRequestId(entry.getKey())
 
-                .setCircularRegion(
-                        entry.getValue().latitude,
-                        entry.getValue().longitude,
-                        Constants.GEOFENCE_RADIUS_IN_METERS
-                )
-                .setExpirationDuration(Constants.GEOFENCE_EXPIRATION_IN_MILLISECONDS)
+        Context context = getApplicationContext();
+
+//        if (Build.VERSION.SDK_INT >= 23 &&
+//                ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
+//                ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+//            return;
+//        }
+
+        zkmFence = new Geofence.Builder()
+                .setRequestId("zkmFence")
+                .setCircularRegion(49.001620, 8.383602, Constants.GEOFENCE_RADIUS_IN_METERS)
                 .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER |
                         Geofence.GEOFENCE_TRANSITION_EXIT)
-                .build());
+                .setExpirationDuration(Constants.GEOFENCE_EXPIRATION_IN_MILLISECONDS)
+                .build();
+
+        geofencingClient.addGeofences(getGeofencingRequest(), getGeofencePendingIntent())
+                .addOnSuccessListener(this, new OnSuccessListener<Void>() {
+                    @Override
+                    public void onSuccess(Void aVoid) {
+                        Log.i(TAG, "Geofences added");
+                    }
+                })
+                .addOnFailureListener(this, new OnFailureListener() {
+                    @Override
+                    public void onFailure(@NonNull Exception e) {
+                        Log.e(TAG, "Failed to add geofences");
+                    }
+                });
+
+
         setContentView(R.layout.activity_main); //set the layout
         final TextView simpleTextView = (TextView) findViewById(R.id.location_text); //get the id for TextView
         final Button activateButton = (Button) findViewById(R.id.button); //get the id for button
+
+        simpleTextView.setText("Current Location: 6.5555, 3.2222");
+
+        setInZone(false);
+
         activateButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                simpleTextView.setText("Current Location: 6.5555, 3.2222"); //set the text after clicking button
-                activateButton.setText("Inactive");
+                active = !active;
+                if (active) {
+                    activateButton.setText("Active");
+                } else {
+                    activateButton.setText("Inactive");
+                }
             }
-
         });
-
     }
 
     private GeofencingRequest getGeofencingRequest() {
         GeofencingRequest.Builder builder = new GeofencingRequest.Builder();
         builder.setInitialTrigger(GeofencingRequest.INITIAL_TRIGGER_ENTER);
+        List<Geofence> geofenceList = new ArrayList();
+        geofenceList.add(zkmFence);
         builder.addGeofences(geofenceList);
         return builder.build();
     }
@@ -138,12 +151,54 @@ public class MainActivity extends AppCompatActivity {
         if (geofencePendingIntent != null) {
             return geofencePendingIntent;
         }
-        Intent intent = new Intent(this, GeofenceTransitionsIntentService.class);
+        Intent intent = new Intent(this, MainActivity.class);
         // We use FLAG_UPDATE_CURRENT so that we get the same pending intent back when
         // calling addGeofences() and removeGeofences().
         geofencePendingIntent = PendingIntent.getService(this, 0, intent, PendingIntent.
                 FLAG_UPDATE_CURRENT);
         return geofencePendingIntent;
+    }
+
+    protected void onHandleIntent(Intent intent) {
+        GeofencingEvent geofencingEvent = GeofencingEvent.fromIntent(intent);
+        if (geofencingEvent.hasError()) {
+            int errorCode = geofencingEvent.getErrorCode();
+            Log.e(TAG, "Error: " + String.valueOf(errorCode));
+            return;
+        }
+
+        // Get the transition type.
+        int geofenceTransition = geofencingEvent.getGeofenceTransition();
+
+        // Test that the reported transition was of interest.
+        if (geofenceTransition == Geofence.GEOFENCE_TRANSITION_ENTER ||
+                geofenceTransition == Geofence.GEOFENCE_TRANSITION_EXIT) {
+
+            // Get the geofences that were triggered. A single event can trigger
+            // multiple geofences.
+            List<Geofence> triggeringGeofences = geofencingEvent.getTriggeringGeofences();
+
+            // TODO: Check geofence that was entered
+
+            if (geofenceTransition == Geofence.GEOFENCE_TRANSITION_ENTER) {
+                setInZone(true);
+            } else if (geofenceTransition == Geofence.GEOFENCE_TRANSITION_EXIT) {
+                setInZone(false);
+            }
+        }
+    }
+
+    private void setInZone(boolean inZone) {
+        if (inZone) {
+            Log.i(TAG, "Entered zone!");
+            final TextView simpleTextView = (TextView) findViewById(R.id.location_text);
+            simpleTextView.setBackgroundColor(Color.GREEN);
+        }
+        else {
+            Log.i(TAG, "Exited zone!");
+            final TextView simpleTextView = (TextView) findViewById(R.id.location_text);
+            simpleTextView.setBackgroundColor(Color.YELLOW);
+        }
     }
 
 }
