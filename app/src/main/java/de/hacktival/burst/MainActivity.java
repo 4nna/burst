@@ -1,5 +1,7 @@
 package de.hacktival.burst;
 
+import android.Manifest;
+import android.annotation.SuppressLint;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
@@ -10,6 +12,7 @@ import android.location.LocationManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
+import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
@@ -42,6 +45,7 @@ import de.hacktival.burst.utils.Network;
 public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "MainActivity";
+    private static final int MY_PERMISSIONS_LOCATION = 1;
 
     private GeofencingClient geofencingClient;
     private Geofence zkmFence;
@@ -52,7 +56,6 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
 
         super.onCreate(savedInstanceState);
-        geofencingClient = LocationServices.getGeofencingClient(this);
 
         JSONObject requestParams = new JSONObject();
         try {
@@ -87,34 +90,18 @@ public class MainActivity extends AppCompatActivity {
 
         Context context = getApplicationContext();
 
-//        if (Build.VERSION.SDK_INT >= 23 &&
-//                ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
-//                ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-//            return;
-//        }
-
-        zkmFence = new Geofence.Builder()
-                .setRequestId("zkmFence")
-                .setCircularRegion(49.001620, 8.383602, Constants.GEOFENCE_RADIUS_IN_METERS)
-                .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER |
-                        Geofence.GEOFENCE_TRANSITION_EXIT)
-                .setExpirationDuration(Constants.GEOFENCE_EXPIRATION_IN_MILLISECONDS)
-                .build();
-
-        geofencingClient.addGeofences(getGeofencingRequest(), getGeofencePendingIntent())
-                .addOnSuccessListener(this, new OnSuccessListener<Void>() {
-                    @Override
-                    public void onSuccess(Void aVoid) {
-                        Log.i(TAG, "Geofences added");
-                    }
-                })
-                .addOnFailureListener(this, new OnFailureListener() {
-                    @Override
-                    public void onFailure(@NonNull Exception e) {
-                        Log.e(TAG, "Failed to add geofences");
-                    }
-                });
-
+        if (ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
+                && ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            String[] permissions = {
+                    android.Manifest.permission.ACCESS_COARSE_LOCATION,
+                    android.Manifest.permission.ACCESS_FINE_LOCATION
+            };
+            ActivityCompat.requestPermissions(this,
+                    permissions,
+                    MY_PERMISSIONS_LOCATION);
+        } else {
+            setupGeofence();
+        }
 
         setContentView(R.layout.activity_main); //set the layout
         final TextView simpleTextView = (TextView) findViewById(R.id.location_text); //get the id for TextView
@@ -135,6 +122,53 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         });
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode,
+                                           String[] permissions, int[] grantResults) {
+        switch (requestCode) {
+            case MY_PERMISSIONS_LOCATION: {
+                // If request is cancelled, the result arrays are empty.
+                if (grantResults.length > 0
+                        && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    // permission was granted, yay!
+                    Log.i(TAG, "Location permission granted");
+                    setupGeofence();
+                } else {
+                    // permission denied, boo! Disable the
+                    // functionality that depends on this permission.
+                    Log.i(TAG, "Location permission denied");
+                }
+            }
+            return;
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private void setupGeofence() {
+        zkmFence = new Geofence.Builder()
+                .setRequestId("zkmFence")
+                .setCircularRegion(49.001620, 8.383602, Constants.GEOFENCE_RADIUS_IN_METERS)
+                .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER |
+                        Geofence.GEOFENCE_TRANSITION_EXIT)
+                .setExpirationDuration(Constants.GEOFENCE_EXPIRATION_IN_MILLISECONDS)
+                .build();
+
+        geofencingClient = LocationServices.getGeofencingClient(this);
+        geofencingClient.addGeofences(getGeofencingRequest(), getGeofencePendingIntent())
+                .addOnSuccessListener(this, new OnSuccessListener<Void>() {
+                    @Override
+                    public void onSuccess(Void aVoid) {
+                        Log.i(TAG, "Geofences added");
+                    }
+                })
+                .addOnFailureListener(this, new OnFailureListener() {
+                    @Override
+                    public void onFailure(@NonNull Exception e) {
+                        Log.e(TAG, "Failed to add geofences");
+                    }
+                });
     }
 
     private GeofencingRequest getGeofencingRequest() {
@@ -193,8 +227,7 @@ public class MainActivity extends AppCompatActivity {
             Log.i(TAG, "Entered zone!");
             final TextView simpleTextView = (TextView) findViewById(R.id.location_text);
             simpleTextView.setBackgroundColor(Color.GREEN);
-        }
-        else {
+        } else {
             Log.i(TAG, "Exited zone!");
             final TextView simpleTextView = (TextView) findViewById(R.id.location_text);
             simpleTextView.setBackgroundColor(Color.YELLOW);
