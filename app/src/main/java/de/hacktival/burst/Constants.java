@@ -6,6 +6,6 @@ public class Constants {
         // restrict instantiation
     }
 
-    public static final double GEOFENCE_RADIUS_IN_METERS = 100;
-    public static final double GEOFENCE_EXPIRATION_IN_MILLISECONDS = 1000000;
+    public static final float GEOFENCE_RADIUS_IN_METERS = 100f;
+    public static final long GEOFENCE_EXPIRATION_IN_MILLISECONDS = 1000000;
 }
