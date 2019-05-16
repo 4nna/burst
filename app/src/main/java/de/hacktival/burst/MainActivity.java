@@ -7,6 +7,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Build;
@@ -24,14 +25,22 @@ import com.android.volley.Request;
 import com.android.volley.Response;
 import com.android.volley.VolleyError;
 import com.android.volley.toolbox.JsonObjectRequest;
+import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.Geofence;
 import com.google.android.gms.location.GeofenceStatusCodes;
 import com.google.android.gms.location.GeofencingClient;
 import com.google.android.gms.location.GeofencingEvent;
 import com.google.android.gms.location.GeofencingRequest;
+import com.google.android.gms.location.LocationCallback;
+import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.location.LocationSettingsRequest;
+import com.google.android.gms.location.LocationSettingsResponse;
+import com.google.android.gms.location.SettingsClient;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.android.gms.tasks.Task;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -46,6 +55,12 @@ public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "MainActivity";
     private static final int MY_PERMISSIONS_LOCATION = 1;
+
+    private static final String REQUESTING_LOCATION_UPDATES_KEY = "requestingLocationUpdates"; //???
+    private boolean requestingLocationUpdates; //???
+    private FusedLocationProviderClient fusedLocationClient;
+    private LocationCallback locationCallback;
+    private LocationRequest locationRequest;
 
     private GeofencingClient geofencingClient;
     private Geofence zkmFence;
@@ -103,11 +118,50 @@ public class MainActivity extends AppCompatActivity {
             setupGeofence();
         }
 
+        //#############################update location###########################
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
+        fusedLocationClient.getLastLocation()
+                .addOnSuccessListener(this, new OnSuccessListener<Location>() {
+                    @Override
+                    public void onSuccess(Location location) {
+                        // Got last known location. In some rare situations this can be null.
+                        if (location != null) {
+                            // Logic to handle location object
+                        }
+                    }
+                });
+
+        locationCallback = new LocationCallback() {
+            @Override
+            public void onLocationResult(LocationResult locationResult) {
+                if (locationResult == null) {
+                    return;
+                }
+                for (Location location : locationResult.getLocations()) {
+                    // Update UI with location data
+                    // ...
+                }
+            };
+        };
+
+        createLocationRequest();
+        updateValuesFromBundle(savedInstanceState);
+
+        LocationSettingsRequest.Builder builder = new LocationSettingsRequest.Builder()
+                .addLocationRequest(locationRequest);
+
+        SettingsClient client = LocationServices.getSettingsClient(this);
+        Task<LocationSettingsResponse> task = client.checkLocationSettings(builder.build());
+
+
+
+        //#############################
+
         setContentView(R.layout.activity_main); //set the layout
         final TextView simpleTextView = (TextView) findViewById(R.id.location_text); //get the id for TextView
         final Button activateButton = (Button) findViewById(R.id.button); //get the id for button
 
-        simpleTextView.setText("Current Location: 6.5555, 3.2222");
+        simpleTextView.setText("Current Location: 49.001620, 8.383602");
 
         setInZone(false);
 
@@ -144,6 +198,9 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
     }
+
+
+
 
     @SuppressLint("MissingPermission")
     private void setupGeofence() {
@@ -232,6 +289,71 @@ public class MainActivity extends AppCompatActivity {
             final TextView simpleTextView = (TextView) findViewById(R.id.location_text);
             simpleTextView.setBackgroundColor(Color.YELLOW);
         }
+    }
+
+    //########################### Request Location Updates ###############################
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        outState.putBoolean(REQUESTING_LOCATION_UPDATES_KEY,
+                requestingLocationUpdates);
+        // ...
+        super.onSaveInstanceState(outState);
+    }
+
+    //better: onRestoreInstanceState() //does not need to be called in onCreate, does not need to check if savedInstanceState==null..
+    private void updateValuesFromBundle(Bundle savedInstanceState) {
+        if (savedInstanceState == null) {
+            return;
+        }
+
+        // Update the value of requestingLocationUpdates from the Bundle.
+        if (savedInstanceState.keySet().contains(REQUESTING_LOCATION_UPDATES_KEY)) {
+            requestingLocationUpdates = savedInstanceState.getBoolean(
+                    REQUESTING_LOCATION_UPDATES_KEY);
+        }
+
+        // ...
+
+        // Update UI to match restored state
+        updateUI();
+    }
+
+    protected void updateUI(){
+        final TextView simpleTextView = (TextView) findViewById(R.id.location_text);
+        simpleTextView.setText("Current Location:");
+
+    }
+
+    protected void createLocationRequest() {
+        LocationRequest locationRequest = LocationRequest.create();
+        locationRequest.setInterval(10000);
+        locationRequest.setFastestInterval(5000);
+        locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY); //PRIORITY_BALANCED_POWER_ACCURACY  (should be enough)
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        stopLocationUpdates();
+    }
+
+    private void stopLocationUpdates() {
+        fusedLocationClient.removeLocationUpdates(locationCallback);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (requestingLocationUpdates) {
+            startLocationUpdates();
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private void startLocationUpdates() {
+        fusedLocationClient.requestLocationUpdates(locationRequest,
+                locationCallback,
+                null /* Looper */);
     }
 
 }
