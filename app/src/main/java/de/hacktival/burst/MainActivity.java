@@ -101,7 +101,39 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
 
         super.onCreate(savedInstanceState);
-/*--
+
+        setContentView(R.layout.activity_main); //set the layout
+        simpleTextView = (TextView) findViewById(R.id.location_text); //get the id for TextView
+        activateButton = (Button) findViewById(R.id.button); //get the id for button
+
+        simpleTextView.setText(String.format("Current Location: %f, %f", latitude, longitude));
+        activateButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                active = !active;
+                if (active) {
+                    activateButton.setText("Active");
+                } else {
+                    activateButton.setText("Inactive");
+                }
+            }
+        });
+        ButterKnife.bind(this);
+
+        init_location();
+        //init_network();
+        init_fences();
+        //setupGeofence();
+        updateValuesFromBundle(savedInstanceState);
+
+    }
+
+    private void init_fences(){
+        setupGeofence();
+        setInZone(false);
+    }
+
+    private void init_network(){
         JSONObject requestParams = new JSONObject();
         try {
             requestParams.put("username", de.hacktival.burst.Settings.username);
@@ -110,7 +142,7 @@ public class MainActivity extends AppCompatActivity {
             e.printStackTrace();
         }
         JsonObjectRequest jsonObjectRequest = new JsonObjectRequest
-                (Request.Method.POST, Settings.serverUrl + "user/login/", requestParams, new Response.Listener<JSONObject>() {
+                (Request.Method.POST, de.hacktival.burst.Settings.serverUrl + "user/login/", requestParams, new Response.Listener<JSONObject>() {
 
                     @Override
                     public void onResponse(JSONObject response) {
@@ -131,50 +163,7 @@ public class MainActivity extends AppCompatActivity {
                     }
                 });
         Network.getInstance(this).addToRequestQueue(jsonObjectRequest);
-
-*/
-        setContentView(R.layout.activity_main); //set the layout
-        simpleTextView = (TextView) findViewById(R.id.location_text); //get the id for TextView
-        activateButton = (Button) findViewById(R.id.button); //get the id for button
-
-        simpleTextView.setText(String.format("Current Location: %f, %f", latitude, longitude));
-        activateButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                active = !active;
-                if (active) {
-                    activateButton.setText("Active");
-                } else {
-                    activateButton.setText("Inactive");
-                }
-            }
-        });
-        ButterKnife.bind(this);
-
-        init_location();
-        updateValuesFromBundle(savedInstanceState);
-
-        Context context = getApplicationContext();
-
-        if (ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
-                && ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            String[] permissions = {
-                    android.Manifest.permission.ACCESS_COARSE_LOCATION,
-                    android.Manifest.permission.ACCESS_FINE_LOCATION
-            };
-            ActivityCompat.requestPermissions(this,
-                    permissions,
-                    MY_PERMISSIONS_LOCATION);
-        } else {
-           setupGeofence();
-        }
-
-        setInZone(false);
-
-
     }
-
-
 
     private void init_location(){
         mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
@@ -422,6 +411,7 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void onSuccess(Void aVoid) {
                         Log.i(TAG, "Geofences added");
+                        Toast.makeText(getApplicationContext(), "Geofences added", Toast.LENGTH_SHORT).show();
                     }
                 })
                 .addOnFailureListener(this, new OnFailureListener() {
@@ -454,35 +444,23 @@ public class MainActivity extends AppCompatActivity {
         return geofencePendingIntent;
     }
 
-    protected void onHandleIntent(Intent intent) {
-        GeofencingEvent geofencingEvent = GeofencingEvent.fromIntent(intent);
-        if (geofencingEvent.hasError()) {
-            int errorCode = geofencingEvent.getErrorCode();
-            Log.e(TAG, "Error: " + String.valueOf(errorCode));
-            return;
-        }
-
-        // Get the transition type.
-        int geofenceTransition = geofencingEvent.getGeofenceTransition();
-
-        // Test that the reported transition was of interest.
-        if (geofenceTransition == Geofence.GEOFENCE_TRANSITION_ENTER ||
-                geofenceTransition == Geofence.GEOFENCE_TRANSITION_EXIT) {
-
-            // Get the geofences that were triggered. A single event can trigger
-            // multiple geofences.
-            List<Geofence> triggeringGeofences = geofencingEvent.getTriggeringGeofences();
-
-            // TODO: Check geofence that was entered
-
-            if (geofenceTransition == Geofence.GEOFENCE_TRANSITION_ENTER) {
-                setInZone(true);
-            } else if (geofenceTransition == Geofence.GEOFENCE_TRANSITION_EXIT) {
-                setInZone(false);
-            }
-        }
+    private void stopGeofences() {
+        geofencingClient.removeGeofences(getGeofencePendingIntent())
+                .addOnSuccessListener(this, new OnSuccessListener<Void>() {
+                    @Override
+                    public void onSuccess(Void aVoid) {
+                        Log.i(TAG, "Geofences removed");
+                        Toast.makeText(getApplicationContext(), "Geofences removed", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .addOnFailureListener(this, new OnFailureListener() {
+                    @Override
+                    public void onFailure(@NonNull Exception e) {
+                        // Failed to remove geofences
+                        Log.e(TAG, "Failed to remove geofences");
+                    }
+                });
     }
-
     private void setInZone(boolean inZone) {
         if (inZone) {
             Log.i(TAG, "Entered zone!");
@@ -495,6 +473,12 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-
+/* catch notification from geofencetransitionservice
+if (geofenceTransition == Geofence.GEOFENCE_TRANSITION_ENTER) {
+                setInZone(true);
+            } else if (geofenceTransition == Geofence.GEOFENCE_TRANSITION_EXIT) {
+                setInZone(false);
+            }
+ */
 
 }
