@@ -80,8 +80,6 @@ public class MainActivity extends AppCompatActivity {
     //private static final String REQUESTING_LOCATION_UPDATES_KEY = "requesting_Location_Updates";
     private double latitude;
     private double longitude;
-    Button btnStartUpdates;
-    Button btnStopUpdates;
     TextView simpleTextView;
     Button activateButton;
 
@@ -138,8 +136,6 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main); //set the layout
         simpleTextView = (TextView) findViewById(R.id.location_text); //get the id for TextView
         activateButton = (Button) findViewById(R.id.button); //get the id for button
-        btnStartUpdates=findViewById(R.id.btn_start_location_updates);
-        btnStopUpdates=findViewById(R.id.btn_stop_location_updates);
 
         simpleTextView.setText(String.format("Current Location: %f, %f", latitude, longitude));
         activateButton.setOnClickListener(new View.OnClickListener() {
@@ -196,7 +192,7 @@ public class MainActivity extends AppCompatActivity {
             };
         };
 
-        mRequestingLocationUpdates = false;
+        mRequestingLocationUpdates = true;
         //LocationRequest mlocationRequest = LocationRequest.create();
         mLocationRequest = new LocationRequest();
         mLocationRequest.setInterval(10000);
@@ -239,7 +235,6 @@ public class MainActivity extends AppCompatActivity {
             //simpleTextView.setBackgroundColor(Color.BLUE);
             simpleTextView.setText(String.format("Current Location: %f - %f ", mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude()));
         }
-        toggleButtons();
     }
 
     @Override
@@ -249,15 +244,6 @@ public class MainActivity extends AppCompatActivity {
         super.onSaveInstanceState(outState);
     }
 
-    private void toggleButtons() {
-        if (mRequestingLocationUpdates) {
-            btnStartUpdates.setEnabled(false);
-            btnStopUpdates.setEnabled(true);
-        } else {
-            btnStartUpdates.setEnabled(true);
-            btnStopUpdates.setEnabled(false);
-        }
-    }
 
 
 
@@ -318,42 +304,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-
-    @OnClick(R.id.btn_start_location_updates)
-    public void startLocationButtonClick() {
-        // Requesting ACCESS_FINE_LOCATION using Dexter library
-        Dexter.withActivity(this)
-                .withPermission(Manifest.permission.ACCESS_FINE_LOCATION)
-                .withListener(new PermissionListener() {
-                    @Override
-                    public void onPermissionGranted(PermissionGrantedResponse response) {
-                        mRequestingLocationUpdates = true;
-                        startLocationUpdates();
-                    }
-
-                    @Override
-                    public void onPermissionDenied(PermissionDeniedResponse response) {
-                        if (response.isPermanentlyDenied()) {
-                            // open device settings when the permission is
-                            // denied permanently
-                            openSettings();
-                        }
-                    }
-
-                    @Override
-                    public void onPermissionRationaleShouldBeShown(PermissionRequest permission, PermissionToken token) {
-                        token.continuePermissionRequest();
-                    }
-                }).check();
-    }
-
-    @OnClick(R.id.btn_stop_location_updates)
-    public void stopLocationButtonClick() {
-        mRequestingLocationUpdates = false;
-        stopLocationUpdates();
-    }
-
-
     private void stopLocationUpdates() {
         // Removing location updates
         mFusedLocationClient
@@ -362,7 +312,6 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void onComplete(@NonNull Task<Void> task) {
                         Toast.makeText(getApplicationContext(), "Location updates stopped!", Toast.LENGTH_SHORT).show();
-                        toggleButtons();
                     }
                 });
     }
