@@ -18,12 +18,14 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Looper;
+import android.provider.Settings;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
+//import android.webkit.PermissionRequest;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -52,6 +54,12 @@ import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
+import com.karumi.dexter.Dexter;
+import com.karumi.dexter.PermissionToken;
+import com.karumi.dexter.listener.PermissionDeniedResponse;
+import com.karumi.dexter.listener.PermissionGrantedResponse;
+import com.karumi.dexter.listener.PermissionRequest;
+import com.karumi.dexter.listener.single.PermissionListener;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -59,6 +67,8 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.List;
 
+import butterknife.ButterKnife;
+import butterknife.OnClick;
 import de.hacktival.burst.utils.Network;
 //import static de.hacktival.burst.Constants;
 
@@ -70,6 +80,10 @@ public class MainActivity extends AppCompatActivity {
     //private static final String REQUESTING_LOCATION_UPDATES_KEY = "requesting_Location_Updates";
     private double latitude;
     private double longitude;
+    Button btnStartUpdates;
+    Button btnStopUpdates;
+    TextView simpleTextView;
+    Button activateButton;
 
     private SettingsClient mSettingsClient;
     private FusedLocationProviderClient mFusedLocationClient;
@@ -122,8 +136,10 @@ public class MainActivity extends AppCompatActivity {
 
 */
         setContentView(R.layout.activity_main); //set the layout
-        final TextView simpleTextView = (TextView) findViewById(R.id.location_text); //get the id for TextView
-        final Button activateButton = (Button) findViewById(R.id.button); //get the id for button
+        simpleTextView = (TextView) findViewById(R.id.location_text); //get the id for TextView
+        activateButton = (Button) findViewById(R.id.button); //get the id for button
+        btnStartUpdates=findViewById(R.id.btn_start_location_updates);
+        btnStopUpdates=findViewById(R.id.btn_stop_location_updates);
 
         simpleTextView.setText(String.format("Current Location: %f, %f", latitude, longitude));
         activateButton.setOnClickListener(new View.OnClickListener() {
@@ -137,6 +153,7 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         });
+        ButterKnife.bind(this);
 
         init_location();
         updateValuesFromBundle(savedInstanceState);
@@ -166,22 +183,7 @@ public class MainActivity extends AppCompatActivity {
     private void init_location(){
         mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
         mSettingsClient = LocationServices.getSettingsClient(this);
-       /* mFusedLocationClient.getLastLocation()
-                .addOnSuccessListener(this, new OnSuccessListener<Location>() {
-                    @Override
-                    public void onSuccess(Location location) {
-                        // Got last known location. In some rare situations this can be null.
-                        if (location != null) {
-                            // Logic to handle location object
-                            latitude = location.getLatitude();
-                            longitude = location.getLongitude();
-                            final TextView simpleTextView = (TextView) findViewById(R.id.location_text);
-                            simpleTextView.setBackgroundColor(Color.RED);
-                            simpleTextView.setText(String.format("location is: %f, %f", longitude, latitude));
-                        }
-                    }
-                });
-*/
+
         mLocationCallback = new LocationCallback() {
             @Override
             public void onLocationResult(LocationResult locationResult) {
@@ -194,7 +196,7 @@ public class MainActivity extends AppCompatActivity {
             };
         };
 
-        mRequestingLocationUpdates = true;
+        mRequestingLocationUpdates = false;
         //LocationRequest mlocationRequest = LocationRequest.create();
         mLocationRequest = new LocationRequest();
         mLocationRequest.setInterval(10000);
@@ -234,9 +236,10 @@ public class MainActivity extends AppCompatActivity {
     private void updateLocationUI(){
         if (mCurrentLocation != null) {
             final TextView simpleTextView = (TextView) findViewById(R.id.location_text);
-            simpleTextView.setBackgroundColor(Color.BLUE);
+            //simpleTextView.setBackgroundColor(Color.BLUE);
             simpleTextView.setText(String.format("Current Location: %f - %f ", mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude()));
         }
+        toggleButtons();
     }
 
     @Override
@@ -246,6 +249,18 @@ public class MainActivity extends AppCompatActivity {
         super.onSaveInstanceState(outState);
     }
 
+    private void toggleButtons() {
+        if (mRequestingLocationUpdates) {
+            btnStartUpdates.setEnabled(false);
+            btnStopUpdates.setEnabled(true);
+        } else {
+            btnStartUpdates.setEnabled(true);
+            btnStopUpdates.setEnabled(false);
+        }
+    }
+
+
+
     /**
      * Starting location updates
      * Check whether location settings are satisfied and then
@@ -253,8 +268,8 @@ public class MainActivity extends AppCompatActivity {
      */
 
     //@SuppressLint("MissingPermission")
-   // @SuppressLint("DefaultLocale")
-  /*  private void startLocationUpdates() {
+    // @SuppressLint("DefaultLocale")
+    private void startLocationUpdates() {
         mSettingsClient
                 .checkLocationSettings(mLocationSettingsRequest)
                 .addOnSuccessListener(this, new OnSuccessListener<LocationSettingsResponse>() {
@@ -301,9 +316,58 @@ public class MainActivity extends AppCompatActivity {
                     }
                 });
     }
-*/
 
-/*
+
+
+    @OnClick(R.id.btn_start_location_updates)
+    public void startLocationButtonClick() {
+        // Requesting ACCESS_FINE_LOCATION using Dexter library
+        Dexter.withActivity(this)
+                .withPermission(Manifest.permission.ACCESS_FINE_LOCATION)
+                .withListener(new PermissionListener() {
+                    @Override
+                    public void onPermissionGranted(PermissionGrantedResponse response) {
+                        mRequestingLocationUpdates = true;
+                        startLocationUpdates();
+                    }
+
+                    @Override
+                    public void onPermissionDenied(PermissionDeniedResponse response) {
+                        if (response.isPermanentlyDenied()) {
+                            // open device settings when the permission is
+                            // denied permanently
+                            openSettings();
+                        }
+                    }
+
+                    @Override
+                    public void onPermissionRationaleShouldBeShown(PermissionRequest permission, PermissionToken token) {
+                        token.continuePermissionRequest();
+                    }
+                }).check();
+    }
+
+    @OnClick(R.id.btn_stop_location_updates)
+    public void stopLocationButtonClick() {
+        mRequestingLocationUpdates = false;
+        stopLocationUpdates();
+    }
+
+
+    private void stopLocationUpdates() {
+        // Removing location updates
+        mFusedLocationClient
+                .removeLocationUpdates(mLocationCallback)
+                .addOnCompleteListener(this, new OnCompleteListener<Void>() {
+                    @Override
+                    public void onComplete(@NonNull Task<Void> task) {
+                        Toast.makeText(getApplicationContext(), "Location updates stopped!", Toast.LENGTH_SHORT).show();
+                        toggleButtons();
+                    }
+                });
+    }
+
+
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         switch (requestCode) {
@@ -322,8 +386,8 @@ public class MainActivity extends AppCompatActivity {
                 break;
         }
     }
-*/
-/*
+
+
     private void openSettings() {
         Intent intent = new Intent();
         intent.setAction(
@@ -334,17 +398,16 @@ public class MainActivity extends AppCompatActivity {
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         startActivity(intent);
     }
-*/
-    private void stopLocationUpdates() {
-        // Removing location updates
-        mFusedLocationClient.removeLocationUpdates(mLocationCallback)
-                .addOnCompleteListener(this, new OnCompleteListener<Void>() {
-                    @Override
-                    public void onComplete(@NonNull Task<Void> task) {
-                        Toast.makeText(getApplicationContext(), "Location updates stopped!", Toast.LENGTH_SHORT).show();
-                        //toggleButtons();
-                    }
-                });
+
+
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (mRequestingLocationUpdates && checkPermissions()) {
+            startLocationUpdates();
+        }
+        updateLocationUI();
     }
 
     private boolean checkPermissions() {
@@ -354,84 +417,15 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    private void showMessageOKCancel(String message) {
-        new AlertDialog.Builder(MainActivity.this)
-                .setMessage(message)
-                .setPositiveButton("OK", listener)
-                .setNegativeButton("Cancel", listener)
-                .create()
-                .show();
-    }
-
-    DialogInterface.OnClickListener listener = new DialogInterface.OnClickListener() {
-
-        final int BUTTON_NEGATIVE = -2;
-        final int BUTTON_POSITIVE = -1;
-
-        @Override
-        public void onClick(DialogInterface dialog, int which) {
-            switch (which) {
-                case BUTTON_NEGATIVE:
-                    // int which = -2
-                    dialog.dismiss();
-                    break;
-
-                case BUTTON_POSITIVE:
-                    // int which = -1
-                    ActivityCompat.requestPermissions(
-                            MainActivity.this, new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION},
-                            MY_PERMISSIONS_LOCATION);
-                    dialog.dismiss();
-                    break;
-            }
-        }
-    };
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-   //     if (mRequestingLocationUpdates && checkPermissions()) {
-    //        startLocationUpdates();
-    //    }
-
-        if (ContextCompat.checkSelfPermission(this,
-                Manifest.permission.ACCESS_FINE_LOCATION)
-                != PackageManager.PERMISSION_GRANTED) {
-
-            // Permission is not granted
-            // Should we show an explanation?
-            if (ActivityCompat.shouldShowRequestPermissionRationale(this,
-                    Manifest.permission.ACCESS_FINE_LOCATION)) {
-                showMessageOKCancel("You need to allow access to Camera");
-                // Show an explanation to the user *asynchronously* -- don't block
-                // this thread waiting for the user's response! After the user
-                // sees the explanation, try again to request the permission.
-            } else {
-                // No explanation needed; request the permission
-                ActivityCompat.requestPermissions(this,
-                        new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
-                        MY_PERMISSIONS_LOCATION);
-
-                // MY_PERMISSIONS_REQUEST_READ_CONTACTS is an
-                // app-defined int constant. The callback method gets the
-                // result of the request.
-            }
-        } else {
-            // Permission has already been granted
-            //startLocationUpdates();
-            mFusedLocationClient.requestLocationUpdates(mLocationRequest,
-                    mLocationCallback, Looper.myLooper());
-            updateLocationUI();
-        }
-
-    }
 
 
 
     @Override
     protected void onPause() {
         super.onPause();
-        stopLocationUpdates();
+        if (mRequestingLocationUpdates) {
+            stopLocationUpdates();
+        }
     }
 
 
