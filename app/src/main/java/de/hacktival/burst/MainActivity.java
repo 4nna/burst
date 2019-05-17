@@ -2,8 +2,11 @@ package de.hacktival.burst;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.app.Activity;
+import android.app.AlertDialog;
 import android.app.PendingIntent;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentSender;
 import android.content.pm.PackageManager;
@@ -11,6 +14,7 @@ import android.graphics.Color;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Looper;
@@ -250,7 +254,7 @@ public class MainActivity extends AppCompatActivity {
 
     //@SuppressLint("MissingPermission")
    // @SuppressLint("DefaultLocale")
-    private void startLocationUpdates() {
+  /*  private void startLocationUpdates() {
         mSettingsClient
                 .checkLocationSettings(mLocationSettingsRequest)
                 .addOnSuccessListener(this, new OnSuccessListener<LocationSettingsResponse>() {
@@ -297,9 +301,40 @@ public class MainActivity extends AppCompatActivity {
                     }
                 });
     }
+*/
 
-
-
+/*
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        switch (requestCode) {
+            // Check for the integer request code originally supplied to startResolutionForResult().
+            case REQUEST_CHECK_SETTINGS:
+                switch (resultCode) {
+                    case Activity.RESULT_OK:
+                        Log.e(TAG, "User agreed to make required location settings changes.");
+                        // Nothing to do. startLocationupdates() gets called in onResume again.
+                        break;
+                    case Activity.RESULT_CANCELED:
+                        Log.e(TAG, "User chose not to make required location settings changes.");
+                        mRequestingLocationUpdates = false;
+                        break;
+                }
+                break;
+        }
+    }
+*/
+/*
+    private void openSettings() {
+        Intent intent = new Intent();
+        intent.setAction(
+                Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+        Uri uri = Uri.fromParts("package",
+                BuildConfig.APPLICATION_ID, null);
+        intent.setData(uri);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        startActivity(intent);
+    }
+*/
     private void stopLocationUpdates() {
         // Removing location updates
         mFusedLocationClient.removeLocationUpdates(mLocationCallback)
@@ -318,13 +353,80 @@ public class MainActivity extends AppCompatActivity {
         return permissionState == PackageManager.PERMISSION_GRANTED;
     }
 
+
+    private void showMessageOKCancel(String message) {
+        new AlertDialog.Builder(MainActivity.this)
+                .setMessage(message)
+                .setPositiveButton("OK", listener)
+                .setNegativeButton("Cancel", listener)
+                .create()
+                .show();
+    }
+
+    DialogInterface.OnClickListener listener = new DialogInterface.OnClickListener() {
+
+        final int BUTTON_NEGATIVE = -2;
+        final int BUTTON_POSITIVE = -1;
+
+        @Override
+        public void onClick(DialogInterface dialog, int which) {
+            switch (which) {
+                case BUTTON_NEGATIVE:
+                    // int which = -2
+                    dialog.dismiss();
+                    break;
+
+                case BUTTON_POSITIVE:
+                    // int which = -1
+                    ActivityCompat.requestPermissions(
+                            MainActivity.this, new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION},
+                            MY_PERMISSIONS_LOCATION);
+                    dialog.dismiss();
+                    break;
+            }
+        }
+    };
+
     @Override
     protected void onResume() {
         super.onResume();
-        if (mRequestingLocationUpdates && checkPermissions()) {
-            startLocationUpdates();
+   //     if (mRequestingLocationUpdates && checkPermissions()) {
+    //        startLocationUpdates();
+    //    }
+
+        if (ContextCompat.checkSelfPermission(this,
+                Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED) {
+
+            // Permission is not granted
+            // Should we show an explanation?
+            if (ActivityCompat.shouldShowRequestPermissionRationale(this,
+                    Manifest.permission.ACCESS_FINE_LOCATION)) {
+                showMessageOKCancel("You need to allow access to Camera");
+                // Show an explanation to the user *asynchronously* -- don't block
+                // this thread waiting for the user's response! After the user
+                // sees the explanation, try again to request the permission.
+            } else {
+                // No explanation needed; request the permission
+                ActivityCompat.requestPermissions(this,
+                        new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
+                        MY_PERMISSIONS_LOCATION);
+
+                // MY_PERMISSIONS_REQUEST_READ_CONTACTS is an
+                // app-defined int constant. The callback method gets the
+                // result of the request.
+            }
+        } else {
+            // Permission has already been granted
+            //startLocationUpdates();
+            mFusedLocationClient.requestLocationUpdates(mLocationRequest,
+                    mLocationCallback, Looper.myLooper());
+            updateLocationUI();
         }
+
     }
+
+
 
     @Override
     protected void onPause() {
